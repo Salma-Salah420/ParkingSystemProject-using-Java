@@ -1,0 +1,231 @@
+package service;
+import model.*;
+
+import java.io.*;
+import java.util.*;
+import java.nio.file.*;
+import java.time.LocalDateTime;
+
+public class FileManager {
+    private static final String FOLDER = "park";
+    private static final String TICKET_FILE = FOLDER + "/tickets.txt";
+    private static final String SPOT_FILE = FOLDER + "/spots.txt";
+    private static final String USER_FILE = FOLDER + "/users.txt";
+
+    private static long lastTicketId = 0;
+    static {
+        try {
+            Files.createDirectories(Paths.get(FOLDER));
+        } catch (IOException e) {
+            System.err.println("Error creating folder: " + e.getMessage());
+        }
+    }
+
+
+
+    public static long generateTicketId() {
+        List<Ticket> tickets = getAllTickets();
+        if (!tickets.isEmpty()) {
+            lastTicketId = tickets.stream()
+                    .mapToLong(Ticket::getTicketId)
+                    .max()
+                    .orElse(0);
+        }
+        return ++lastTicketId;
+    }
+
+    public static Ticket getTicketById(long ticketId) {
+        try {
+            List<String> lines = Files.readAllLines(Paths.get(TICKET_FILE));
+            for (String line : lines) {
+                String[] parts = line.split(",", 4);
+                if (Long.parseLong(parts[0]) == ticketId) {
+                    return Ticket.fromString(line);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+
+    public static void saveTicketToFile(Ticket ticket) {
+        List<Ticket> tickets = getAllTickets();
+
+        tickets.removeIf(t -> t.getTicketId() == ticket.getTicketId());
+        tickets.add(ticket);
+
+        tickets.sort(Comparator.comparingLong(Ticket::getTicketId));
+
+        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get(TICKET_FILE),
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+            for (Ticket t : tickets) {
+                bw.write(t.toString());
+                bw.newLine();
+            }
+        } catch (IOException e) {
+            System.err.println("Error saving tickets: " + e.getMessage());
+        }
+    }
+
+
+    public static void saveSpotToFile(ParkingSpot newSpot) {
+        List<ParkingSpot> existingSpots = loadSpotsFromFile();
+
+        existingSpots.removeIf(spot -> spot.getSpotId().equals(newSpot.getSpotId()));
+        existingSpots.add(newSpot);
+
+        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get(SPOT_FILE),
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+            for (ParkingSpot spot : existingSpots) {
+                bw.write(spot.toString());
+                bw.newLine();
+            }
+        } catch (IOException e) {
+            System.err.println("Error saving spots: " + e.getMessage());
+        }
+    }
+
+    public static List<ParkingSpot> loadSpotsFromFile() {
+        List<ParkingSpot> spots = new ArrayList<>();
+        try {
+            if (Files.exists(Paths.get(SPOT_FILE))) {
+                List<String> lines = Files.readAllLines(Paths.get(SPOT_FILE));
+                for (String line : lines) {
+                    if (!line.trim().isEmpty()) {
+                        spots.add(ParkingSpot.fromString(line));
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error loading spots: " + e.getMessage());
+        }
+        return spots;
+    }
+
+    public static List<String> readAllTickets() {
+        try {
+            if (Files.exists(Paths.get(TICKET_FILE))) {
+                return Files.readAllLines(Paths.get(TICKET_FILE));
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading tickets: " + e.getMessage());
+        }
+        return new ArrayList<>();
+    }
+
+
+    public static List<Ticket> getAllTickets() {
+        List<Ticket> tickets = new ArrayList<>();
+        try {
+            if (Files.exists(Paths.get(TICKET_FILE))) {
+                List<String> lines = Files.readAllLines(Paths.get(TICKET_FILE));
+                for (String line : lines) {
+                    if (!line.trim().isEmpty()) {
+                        try {
+                            Ticket t = Ticket.fromString(line);
+                            if (t != null) {
+                                tickets.add(t);
+                            }
+                        } catch (Exception e) {
+                            System.err.println("Invalid ticket data skipped: " + line);
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error loading tickets: " + e.getMessage());
+        }
+        return tickets;
+    }
+
+
+    public static void saveUserToFile(List<AbstractUser> users) {
+        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get(USER_FILE),
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+            for (AbstractUser user : users) {
+                bw.write(user.getId() + "," + user.getName() + "," + user.getpassword() + ","  + user.getRole());
+                bw.newLine();
+            }
+        } catch (IOException e) {
+            System.err.println("Error saving users: " + e.getMessage());
+        }
+    }
+
+
+    public static void saveUserToFile(AbstractUser user) {
+        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get(USER_FILE),
+                StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+            bw.write(user.getId() + "," + user.getName() + "," + user.getpassword() + "," + user.getRole());
+            bw.newLine();
+        } catch (IOException e) {
+            System.err.println("Error saving user: " + e.getMessage());
+        }
+    }
+
+
+    public static void saveAllUsersToFile(List<AbstractUser> users) {
+        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get(USER_FILE),
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+            for (AbstractUser user : users) {
+                bw.write(user.getId() + "," + user.getName() + "," + user.getpassword()  + "," + user.getRole());
+                bw.newLine();
+            }
+        } catch (IOException e) {
+            System.err.println("Error saving users: " + e.getMessage());
+        }
+    }
+
+
+    public static List<AbstractUser> loadUsersFromFile() {
+        List<AbstractUser> users = new ArrayList<>();
+        try {
+            if (Files.exists(Paths.get(USER_FILE))) {
+                List<String> lines = Files.readAllLines(Paths.get(USER_FILE));
+                for (String line : lines) {
+                    if (!line.trim().isEmpty()) {
+                        String[] parts = line.split(",");
+                        String id = parts[0];
+                        String name = parts[1];
+                        String role = parts[3];
+                        String password = parts[2];
+
+                        AbstractUser user;
+                        switch (role) {
+                            case "Admin":
+                                user = new Admin(id, name, password);
+                                break;
+                            case "EntryOperator":
+                                user = new EntryOperator(id, name, password);
+                                break;
+                            case "ExitOperator":
+                                user = new ExitOperator(id, name, password);
+                                break;
+                            default:
+                                continue;
+                        }
+                        users.add(user);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error loading users: " + e.getMessage());
+        }
+        return users;
+    }
+
+
+    public static void overwriteAllUsers(List<AbstractUser> users) {
+        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get(USER_FILE),
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+            for (AbstractUser user : users) {
+                bw.write(user.getId() + "," + user.getName() + "," + user.getpassword()  +"," + user.getRole());
+                bw.newLine();
+            }
+        } catch (IOException e) {
+            System.err.println("Error overwriting users: " + e.getMessage());
+        }
+    }
+
+}
