@@ -1,0 +1,120 @@
+package model;
+import service.FileManager;
+
+
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+
+public class Admin extends AbstractUser {
+    private List<AbstractUser> users = new ArrayList<>();
+    public Admin(String id, String name, String password) {
+        super(id, name, "Admin", password);
+        this.users = FileManager.loadUsersFromFile();
+    }
+    public void addSpot(ParkingLot lot, ParkingSpot spot) {
+        lot.addSpot(spot);
+        FileManager.saveSpotToFile(spot);
+        System.out.println("Spot " + spot.getSpotId() + " has been added.");
+    }
+
+
+    public void viewTotalSpots(ParkingLot lot) {
+        System.out.println("Total spots: " + lot.getTotalSpots());
+    }
+
+
+    public void viewShiftsReport() {
+        List<Ticket> tickets = FileManager.getAllTickets();
+        for (Ticket ticket : tickets) {
+            double payment = ticket.calculatePayment();
+            System.out.println("Ticket ID: " + ticket.getTicketId() +
+                    ", Plate Number: " + ticket.getPlateNumber() +
+                    ", Payment: £" + payment);
+        }
+    }
+
+
+    public void viewParkedCarsReport(ParkingLot lot) {
+        List<Ticket> allTickets = FileManager.getAllTickets();
+        List<ParkingSpot> occupiedSpots = lot.getSpots().stream()
+                .filter(ParkingSpot::isOccupied)
+                .collect(Collectors.toList());
+
+        System.out.println("\n=== Parked Cars Report ===");
+
+        for (ParkingSpot spot : occupiedSpots) {
+
+            Optional<Ticket> matchingTicket = allTickets.stream()
+                    .filter(ticket ->
+                            ticket.getSpotId().equals(spot.getSpotId()) &&
+                                    ticket.getExitTime() == null
+                    )
+                    .findFirst();
+
+            String plateNumber = matchingTicket.isPresent()
+                    ? matchingTicket.get().getPlateNumber()
+                    : "Unknown";
+
+            System.out.println(
+                    "Spot ID: " + spot.getSpotId() +
+                            " | Plate Number: " + plateNumber
+            );
+        }
+    }
+
+
+    public boolean addUser(AbstractUser newUser) {
+        // Check for duplicate ID (case-insensitive)
+        boolean idExists = users.stream()
+                .anyMatch(user -> user.getId().equalsIgnoreCase(newUser.getId()));
+
+        if (idExists) {
+            System.out.println("Error: User ID " + newUser.getId() + " already exists.");
+            return false;
+        } else {
+            users.add(newUser);
+
+            FileManager.saveAllUsersToFile(users);
+            System.out.println("User " + newUser.getName() + " added successfully.");
+            return true;
+        }
+    }
+
+
+    public boolean updateUser(String userId, String newName, String newRole, String newPassword) {
+        for (AbstractUser user : users) {
+            if (user.getId().equals(userId)) {
+                user.setName(newName);
+                user.setRole(newRole);
+                user.setPassword(newPassword);
+                FileManager.overwriteAllUsers(users);
+                return true;
+            }
+        }
+
+        System.out.println("User with ID " + userId + " not found.");
+        return false;
+    }
+
+
+    public boolean deleteUser(String userId) {
+        boolean removed = users.removeIf(user -> user.getId().equalsIgnoreCase(userId));
+        if (removed) {
+            FileManager.overwriteAllUsers(users);
+            System.out.println("User with ID " + userId + " has been deleted.");
+            return true;
+        } else {
+            System.out.println("User with ID " + userId + " not found.");
+            return false;
+        }
+    }
+
+    public List<AbstractUser> getAllUsers() {
+        return users;
+    }
+
+
+}
