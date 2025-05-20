@@ -1,0 +1,66 @@
+package model;
+
+import java.util.*;
+import java.time.LocalDateTime;
+import service.FileManager;
+import java.util.List;
+import java.io.IOException;
+
+public class Customer {
+
+    private static long ids = initializeId();
+
+
+    private static long initializeId() {
+        List<String> tickets = FileManager.readAllTickets();
+        if (tickets.isEmpty()) {
+            return 1000;
+        } else {
+            String lastTicket = tickets.get(tickets.size() - 1);
+            String[] parts = lastTicket.split(",");
+            return Long.parseLong(parts[0]) + 1;
+        }
+    }
+
+    private static long generateTicketId() {
+        return ids++;
+    }
+
+
+    public Ticket printEntryTicket(String plateNumber, String spotId, String operatorName) {
+
+        List<Ticket> tickets = FileManager.getAllTickets();
+        for (Ticket t : tickets) {
+            if (t.getPlateNumber().equalsIgnoreCase(plateNumber.trim())
+                    && t.getExitTime() == null) {
+                System.err.println("Error: Vehicle already parked!");
+                return null;
+            }
+        }
+
+        Ticket ticket = new Ticket(
+                generateTicketId(),
+                plateNumber,
+                LocalDateTime.now(),
+                spotId,
+                operatorName
+        );
+        try {
+            FileManager.saveTicketToFile(ticket);
+        } catch (Exception e) {
+            System.err.println("Error saving the ticket: " + e.getMessage());
+        }
+        return ticket;
+    }
+
+
+    public void payAtExit(Ticket ticket) {
+        ticket.setExitTime(LocalDateTime.now());
+        ticket.calculatePayment();
+        try {
+            FileManager.saveTicketToFile(ticket);
+        } catch (Exception e) {
+            System.err.println("Error updating the ticket: " + e.getMessage());
+        }
+    }
+}
