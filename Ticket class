@@ -1,0 +1,104 @@
+package model;
+import java.time.*;
+import java.lang.*;
+
+public class Ticket {
+    private long ticketId;
+    private String plateNumber;
+    private LocalDateTime entryTime;
+    private LocalDateTime exitTime;
+    private String spotId;
+    private String entryOperatorName;
+    private static final double MINUTE_RATE = 10.0;
+
+    public Ticket(long ticketId, String plateNumber, LocalDateTime entryTime,
+                  String spotId, String entryOperatorName) {
+        this.ticketId = ticketId;
+        this.plateNumber = plateNumber;
+        this.entryTime = entryTime;
+        this.spotId = spotId;
+        this.entryOperatorName = entryOperatorName;
+    }
+    public String getEntryOperatorName() {
+        return entryOperatorName;
+    }
+    // Add getter for spotId
+    public String getSpotId() {
+        return spotId;
+    }
+
+    public void setExitTime(LocalDateTime exitTime) {
+        this.exitTime = exitTime;
+    }
+
+    public LocalDateTime getExitTime() {
+        return exitTime;
+    }
+
+
+    public double calculatePayment() {
+        if (exitTime == null) return 0.0;
+
+        Duration duration = Duration.between(entryTime, exitTime);
+        long minutes = duration.toMinutes();
+
+        // Minimum charge is for 1 minute
+        if (minutes <= 0)
+            minutes = 1;
+
+        double total = minutes * MINUTE_RATE;
+        System.out.println("Total payment for " + plateNumber + ": £" + total +
+                " (" + minutes + " minutes)");
+        return total;
+    }
+
+    public String toString() {
+        return ticketId + "," + plateNumber + "," + entryTime + ","
+                + (exitTime != null ? exitTime : "null") + ","
+                + spotId + "," + entryOperatorName;
+    }
+
+
+    public static Ticket fromString(String data) {
+        String[] parts = data.split(",", -1);
+
+        if (parts.length < 6) {
+            System.err.println("Invalid ticket data: " + data);
+            return null;
+        }
+
+        long ticketId = Long.parseLong(parts[0]);
+        String plateNumber = parts[1];
+        LocalDateTime entryTime = LocalDateTime.parse(parts[2]);
+        String spotId = parts[4];
+        String operatorName = (parts.length >= 6) ? parts[5] : "Unknown"; // Handle new field
+
+        Ticket t = new Ticket(ticketId, plateNumber, entryTime, spotId, operatorName);
+
+        if (!parts[3].equals("null") && !parts[3].isEmpty()) {
+            t.setExitTime(LocalDateTime.parse(parts[3]));
+        }
+
+        return t;
+    }
+
+
+    public long getTicketId() {
+        return this.ticketId;
+    }
+
+    public String getPlateNumber() {
+        return this.plateNumber;
+    }
+
+
+    public LocalDateTime getEntryTime() {
+        return this.entryTime;
+    }
+
+
+
+
+
+
+}
