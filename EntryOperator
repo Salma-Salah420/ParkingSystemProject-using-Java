@@ -1,0 +1,86 @@
+package model;
+
+import service.FileManager;
+
+import java.util.List;
+import java.util.Scanner;
+import java.time.LocalDateTime;
+
+import java.util.stream.Collectors;
+public class EntryOperator extends AbstractUser {
+
+
+        public EntryOperator(String id, String name, String password) {
+            super(id, name, "EntryOperator", password);
+        }
+
+
+
+
+    public void viewFreeSpots(ParkingLot lot) {
+        List<String> freeSpots = lot.getFreeSpots();
+        System.out.println("Free Spots (" + freeSpots.size() + "):");
+        freeSpots.forEach(System.out::println);
+    }
+
+    public void suggestSpots(ParkingLot lot) {
+        ParkingSpot spot = lot.getNextFreeSpot();
+        if (spot != null) {
+            System.out.println("Suggested spot: " + spot.getSpotId() + " (Free)");
+        } else {
+            System.out.println("No free spots available.");
+        }
+    }
+
+
+    public void addCustomer(ParkingLot lot) {
+        Scanner input = new Scanner(System.in);
+        System.out.print("Enter plate number: ");
+        String plateNumber = input.nextLine();
+
+        List<String> freeSpots = lot.getFreeSpots();
+        if (freeSpots.isEmpty()) {
+            System.out.println("No free spots available.");
+            return;
+        }
+
+        System.out.println("Available spots: " + String.join(", ", freeSpots));
+        System.out.print("Enter desired spot ID: ");
+        String spotId = input.nextLine();
+
+        if (!freeSpots.contains(spotId)) {
+            System.out.println("Invalid or occupied spot!");
+            return;
+        }
+
+
+        ParkingSpot spot = lot.getSpotById(spotId);
+        if (spot == null) {
+            System.out.println("Invalid spot selection!");
+            return;
+        }
+
+
+        spot.setOccupied(true);
+        FileManager.saveSpotToFile(spot);
+
+        Customer customer = new Customer();
+        Ticket ticket = customer.printEntryTicket(plateNumber, spotId, this.getName());
+
+        if (ticket != null) {
+            System.out.println("\n=== Parking Ticket ===");
+            System.out.println("Ticket ID: " + ticket.getTicketId());
+            System.out.println("Plate Number: " + ticket.getPlateNumber());
+            System.out.println("Transaction Number: " + ticket.getTicketId());
+            System.out.println("Entry Operator: " + this.getName());
+            System.out.println("Entry Time: " + ticket.getEntryTime());
+            System.out.println("Assigned Spot: " + spotId);
+            System.out.println("=======================");
+        } else {
+            System.out.println("Failed to create ticket!");
+
+            spot.setOccupied(false);
+            FileManager.saveSpotToFile(spot);
+        }
+    }
+}
