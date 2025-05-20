@@ -1,0 +1,12 @@
+package model;
+
+public class ExitOperator extends AbstractUser {
+    public ExitOperator(String id, String name, String password) {
+        super(id, name, "ExitOperator", password);
+    }
+
+    public void calculateTotal(Ticket ticket) {
+        ticket.setExitTime(java.time.LocalDateTime.now());
+        ticket.calculatePayment();
+    }
+}
