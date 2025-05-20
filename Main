@@ -1,0 +1,634 @@
+import model.*;
+import service.*;
+import java.util.Optional;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.time.LocalDateTime;
+import java.util.List;
+
+public class Main {
+    private static final String ADMIN_ID = "a1";
+    private static final String ADMIN_NAME = "randa";
+    private static final String ADMIN_PASSWORD = "1234";
+    private static final int MAX_LOGIN_ATTEMPTS = 3;
+
+    private static ParkingLot parkingLot = new ParkingLot();
+    private static AbstractUser loggedInUser;
+    private static JFrame frame;
+    private static CardLayout cardLayout;
+    private static JPanel cardPanel;
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            createAndShowGUI();
+        });
+    }
+
+    private static void createAndShowGUI() {
+        frame = new JFrame("Parking Management System");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(800, 600);
+        frame.setLocationRelativeTo(null);
+
+        cardLayout = new CardLayout();
+        cardPanel = new JPanel(cardLayout);
+
+        createLoginPanel();
+        createAdminPanel();
+        createEntryOperatorPanel();
+        createExitOperatorPanel();
+
+        frame.add(cardPanel);
+        frame.setVisible(true);
+    }
+
+    private static void createLoginPanel() {
+        JPanel loginPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        JLabel titleLabel = new JLabel("Parking Management System Login");
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 2;
+        loginPanel.add(titleLabel, gbc);
+
+        JLabel userTypeLabel = new JLabel("User Type:");
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        loginPanel.add(userTypeLabel, gbc);
+
+        JComboBox<String> userTypeCombo = new JComboBox<>(new String[]{"Admin", "Entry Operator", "Exit Operator"});
+        gbc.gridx = 1;
+        gbc.gridy = 1;
+        loginPanel.add(userTypeCombo, gbc);
+
+        JLabel idLabel = new JLabel("ID:");
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        loginPanel.add(idLabel, gbc);
+
+        JTextField idField = new JTextField(15);
+        gbc.gridx = 1;
+        gbc.gridy = 2;
+        loginPanel.add(idField, gbc);
+
+        JLabel nameLabel = new JLabel("Name (Admin only):");
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        loginPanel.add(nameLabel, gbc);
+
+        JTextField nameField = new JTextField(15);
+        gbc.gridx = 1;
+        gbc.gridy = 3;
+        loginPanel.add(nameField, gbc);
+
+        JLabel passwordLabel = new JLabel("Password:");
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        loginPanel.add(passwordLabel, gbc);
+
+        JPasswordField passwordField = new JPasswordField(15);
+        gbc.gridx = 1;
+        gbc.gridy = 4;
+        loginPanel.add(passwordField, gbc);
+
+        JButton loginButton = new JButton("Login");
+        gbc.gridx = 0;
+        gbc.gridy = 5;
+        gbc.gridwidth = 2;
+        loginButton.setPreferredSize(new Dimension(200, 30));
+        loginPanel.add(loginButton, gbc);
+
+        // Show/hide name field based on user type
+        nameLabel.setVisible(false);
+        nameField.setVisible(false);
+        userTypeCombo.addActionListener(e -> {
+            boolean isAdmin = userTypeCombo.getSelectedIndex() == 0;
+            nameLabel.setVisible(isAdmin);
+            nameField.setVisible(isAdmin);
+        });
+
+        loginButton.addActionListener(e -> {
+            int userType = userTypeCombo.getSelectedIndex();
+            String id = idField.getText();
+            String name = nameField.getText();
+            String password = new String(passwordField.getPassword());
+
+            switch (userType) {
+                case 0: // Admin
+                    if (id.equals(ADMIN_ID)) {
+                    if (name.equals(ADMIN_NAME)) {
+                        if (password.equals(ADMIN_PASSWORD)) {
+                            loggedInUser = new Admin(ADMIN_ID, ADMIN_NAME, ADMIN_PASSWORD);
+                            loggedInUser.login();
+                            cardLayout.show(cardPanel, "AdminPanel");
+                        } else {
+                            JOptionPane.showMessageDialog(frame, "Incorrect password", "Error", JOptionPane.ERROR_MESSAGE);
+                        }
+                    } else {
+                        JOptionPane.showMessageDialog(frame, "Incorrect name", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(frame, "Incorrect ID", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+                break;
+                case 1: // Entry Operator
+                case 2: // Exit Operator
+                    List<AbstractUser> users = FileManager.loadUsersFromFile();
+                    boolean loginSuccess = false;
+
+                    for (AbstractUser user : users) {
+                        if ((userType == 1 && user instanceof EntryOperator ||
+                                userType == 2 && user instanceof ExitOperator) &&
+                                user.getId().equals(id) &&
+                                user.getpassword().equals(password)) {
+                            loggedInUser = user;
+                            loggedInUser.login();
+                            loginSuccess = true;
+                            if (userType == 1) {
+                                cardLayout.show(cardPanel, "EntryOperatorPanel");
+                            } else {
+                                cardLayout.show(cardPanel, "ExitOperatorPanel");
+                            }
+                            break;
+                        }
+                    }
+
+                    if (!loginSuccess) {
+                        JOptionPane.showMessageDialog(frame, "Invalid credentials", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                    break;
+            }
+        });
+
+        cardPanel.add(loginPanel, "LoginPanel");
+    }
+
+    private static void createAdminPanel() {
+        JPanel adminPanel = new JPanel(new BorderLayout());
+
+        // Menu panel
+        JPanel menuPanel = new JPanel(new GridLayout(6, 1, 10, 10));
+        menuPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JButton addSpotButton = new JButton("Add Parking Spot");
+        JButton viewSpotsButton = new JButton("View Total Spots");
+        JButton manageUsersButton = new JButton("Manage Users");
+        JButton shiftReportButton = new JButton("View Shift Report");
+        JButton parkedCarsButton = new JButton("View Parked Cars Report");
+        JButton logoutButton = new JButton("Logout");
+
+        menuPanel.add(addSpotButton);
+        menuPanel.add(viewSpotsButton);
+        menuPanel.add(manageUsersButton);
+        menuPanel.add(shiftReportButton);
+        menuPanel.add(parkedCarsButton);
+        menuPanel.add(logoutButton);
+
+        // Content panel
+        JPanel contentPanel = new JPanel(new BorderLayout());
+        JTextArea outputArea = new JTextArea();
+        outputArea.setEditable(false);
+        JScrollPane scrollPane = new JScrollPane(outputArea);
+        contentPanel.add(scrollPane, BorderLayout.CENTER);
+
+        adminPanel.add(menuPanel, BorderLayout.WEST);
+        adminPanel.add(contentPanel, BorderLayout.CENTER);
+
+        // Button actions
+        addSpotButton.addActionListener(e -> {
+            String spotId = JOptionPane.showInputDialog(frame, "Enter spot ID:");
+            if (spotId != null && !spotId.trim().isEmpty()) {
+                boolean exists = parkingLot.getSpots().stream()
+                        .anyMatch(spot -> spot.getSpotId().equals(spotId));
+
+                if (exists) {
+                    outputArea.append("Error: SPOT ID already exists!\n");
+                } else {
+                    ParkingSpot newSpot = new ParkingSpot(spotId, false);
+                    FileManager.saveSpotToFile(newSpot);
+                    parkingLot.getSpots().add(newSpot);
+                    outputArea.append("Spot " + spotId + " added successfully.\n");
+                }
+            }
+        });
+
+        viewSpotsButton.addActionListener(e -> {
+            outputArea.setText("");
+            outputArea.append("Total spots: " + parkingLot.getTotalSpots() + "\n");
+            outputArea.append("Free spots: " + parkingLot.getFreeSpots().size() + "\n\n");
+
+            for (ParkingSpot spot : parkingLot.getSpots()) {
+                outputArea.append("Spot ID: " + spot.getSpotId() +
+                        " - Status: " + (spot.isOccupied() ? "Occupied" : "Free") + "\n");
+            }
+        });
+
+        manageUsersButton.addActionListener(e -> {
+            showUserManagementDialog((Admin) loggedInUser, outputArea);
+        });
+
+        shiftReportButton.addActionListener(e -> {
+            outputArea.setText("");
+            List<Ticket> tickets = FileManager.getAllTickets();
+            double totalRevenue = 0;
+            outputArea.append("--- Shift Report ---\n");
+            for (Ticket ticket : tickets) {
+                double payment = ticket.calculatePayment();
+                totalRevenue += payment;
+                outputArea.append(String.format("Ticket ID: %d, Plate: %s, Entry: %s, Exit: %s, Payment: £%.2f%n",
+                        ticket.getTicketId(), ticket.getPlateNumber(),
+                        ticket.getEntryTime(), ticket.getExitTime(), payment));
+            }
+            outputArea.append(String.format("Total Revenue: £%.2f%n", totalRevenue));
+        });
+
+        parkedCarsButton.addActionListener(e -> {
+            outputArea.setText("");
+            outputArea.append("--- Parked Vehicles Report ---\n");
+            List<Ticket> tickets = FileManager.getAllTickets();
+            List<ParkingSpot> allSpots = parkingLot.getSpots();
+
+            for (ParkingSpot spot : allSpots) {
+                String spotId = spot.getSpotId();
+                if (spot.isOccupied()) {
+                    Optional<Ticket> activeTicket = tickets.stream()
+                            .filter(t -> t.getSpotId().equals(spotId) && t.getExitTime() == null)
+                            .findFirst();
+
+                    if (activeTicket.isPresent()) {
+                        outputArea.append("Spot " + spotId + " - Plate: " + activeTicket.get().getPlateNumber() + "\n");
+                    } else {
+                        outputArea.append("Spot " + spotId + " - Occupied\n");
+                    }
+                } else {
+                    outputArea.append("Spot " + spotId + " - Available\n");
+                }
+            }
+        });
+
+        logoutButton.addActionListener(e -> {
+            loggedInUser.logout();
+            cardLayout.show(cardPanel, "LoginPanel");
+        });
+
+        cardPanel.add(adminPanel, "AdminPanel");
+    }
+
+    private static void showUserManagementDialog(Admin admin, JTextArea outputArea) {
+        JDialog userDialog = new JDialog(frame, "User Management", true);
+        userDialog.setSize(600, 400);
+        userDialog.setLayout(new BorderLayout());
+
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 3, 10, 10));
+        JButton addButton = new JButton("Add User");
+        JButton updateButton = new JButton("Update User");
+        JButton deleteButton = new JButton("Delete User");
+        buttonPanel.add(addButton);
+        buttonPanel.add(updateButton);
+        buttonPanel.add(deleteButton);
+
+        JTextArea userOutputArea = new JTextArea();
+        userOutputArea.setEditable(false);
+        JScrollPane scrollPane = new JScrollPane(userOutputArea);
+
+        // Display current users
+        refreshUserList(admin, userOutputArea);
+
+        userDialog.add(buttonPanel, BorderLayout.NORTH);
+        userDialog.add(scrollPane, BorderLayout.CENTER);
+
+        addButton.addActionListener(e -> {
+            JPanel addPanel = new JPanel(new GridLayout(4, 2, 10, 10));
+            addPanel.add(new JLabel("User ID:"));
+            JTextField idField = new JTextField();
+            addPanel.add(idField);
+            addPanel.add(new JLabel("Name:"));
+            JTextField nameField = new JTextField();
+            addPanel.add(nameField);
+            addPanel.add(new JLabel("Password:"));
+            JPasswordField passwordField = new JPasswordField();
+            addPanel.add(passwordField);
+            addPanel.add(new JLabel("Role:"));
+            JComboBox<String> roleCombo = new JComboBox<>(new String[]{"Entry Operator", "Exit Operator"});
+            addPanel.add(roleCombo);
+
+            int result = JOptionPane.showConfirmDialog(userDialog, addPanel, "Add User",
+                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+            if (result == JOptionPane.OK_OPTION) {
+                String id = idField.getText();
+                String name = nameField.getText();
+                String password = new String(passwordField.getPassword());
+                String role = roleCombo.getSelectedIndex() == 0 ? "EntryOperator" : "ExitOperator";
+
+                AbstractUser user;
+                if (role.equals("EntryOperator")) {
+                    user = new EntryOperator(id, name, password);
+                } else {
+                    user = new ExitOperator(id, name, password);
+                }
+
+                boolean success = admin.addUser(user);
+                if (success) {
+                    refreshUserList(admin, userOutputArea);
+                    outputArea.append("User " + name + " added successfully.\n");
+                } else {
+                    JOptionPane.showMessageDialog(userDialog, "Failed to add user. ID may already exist.",
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        updateButton.addActionListener(e -> {
+            String userId = JOptionPane.showInputDialog(userDialog, "Enter user ID to update:");
+            if (userId != null && !userId.trim().isEmpty()) {
+                AbstractUser userToUpdate = null;
+                for (AbstractUser user : admin.getAllUsers()) {
+                    if (user.getId().equals(userId)) {
+                        userToUpdate = user;
+                        break;
+                    }
+                }
+
+                if (userToUpdate != null) {
+                    JPanel updatePanel = new JPanel(new GridLayout(3, 2, 10, 10));
+                    updatePanel.add(new JLabel("New Name:"));
+                    JTextField nameField = new JTextField(userToUpdate.getName());
+                    updatePanel.add(nameField);
+                    updatePanel.add(new JLabel("New Password:"));
+                    JPasswordField passwordField = new JPasswordField();
+                    updatePanel.add(passwordField);
+                    updatePanel.add(new JLabel("New Role:"));
+                    JComboBox<String> roleCombo = new JComboBox<>(new String[]{"Entry Operator", "Exit Operator"});
+                    roleCombo.setSelectedIndex(userToUpdate.getRole().equals("EntryOperator") ? 0 : 1);
+                    updatePanel.add(roleCombo);
+
+                    int result = JOptionPane.showConfirmDialog(userDialog, updatePanel, "Update User",
+                            JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+                    if (result == JOptionPane.OK_OPTION) {
+                        String newName = nameField.getText();
+                        String newPassword = new String(passwordField.getPassword());
+                        String newRole = roleCombo.getSelectedIndex() == 0 ? "EntryOperator" : "ExitOperator";
+
+                        boolean success = admin.updateUser(userId, newName, newRole, newPassword);
+                        if (success) {
+                            refreshUserList(admin, userOutputArea);
+                            outputArea.append("User " + userId + " updated successfully.\n");
+                        } else {
+                            JOptionPane.showMessageDialog(userDialog, "Failed to update user.",
+                                    "Error", JOptionPane.ERROR_MESSAGE);
+                        }
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(userDialog, "User not found.",
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        deleteButton.addActionListener(e -> {
+            String userId = JOptionPane.showInputDialog(userDialog, "Enter user ID to delete:");
+            if (userId != null && !userId.trim().isEmpty()) {
+                int confirm = JOptionPane.showConfirmDialog(userDialog,
+                        "Are you sure you want to delete user " + userId + "?",
+                        "Confirm Delete", JOptionPane.YES_NO_OPTION);
+
+                if (confirm == JOptionPane.YES_OPTION) {
+                    boolean success = admin.deleteUser(userId);
+                    if (success) {
+                        refreshUserList(admin, userOutputArea);
+                        outputArea.append("User " + userId + " deleted successfully.\n");
+                    } else {
+                        JOptionPane.showMessageDialog(userDialog, "User not found.",
+                                "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            }
+        });
+
+        userDialog.setVisible(true);
+    }
+
+    private static void refreshUserList(Admin admin, JTextArea outputArea) {
+        outputArea.setText("");
+        outputArea.append("=== Current Users ===\n");
+        for (AbstractUser user : admin.getAllUsers()) {
+            outputArea.append(String.format("ID: %s, Name: %s, Role: %s%n",
+                    user.getId(), user.getName(), user.getRole()));
+        }
+    }
+
+    private static void createEntryOperatorPanel() {
+        JPanel entryPanel = new JPanel(new BorderLayout());
+
+        // Menu panel
+        JPanel menuPanel = new JPanel(new GridLayout(4, 1, 10, 10));
+        menuPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JButton viewSpotsButton = new JButton("View Free Spots");
+        JButton addCustomerButton = new JButton("Add Customer");
+        JButton suggestSpotsButton = new JButton("Suggest Free Spots");
+        JButton logoutButton = new JButton("Logout");
+
+        menuPanel.add(viewSpotsButton);
+        menuPanel.add(addCustomerButton);
+        menuPanel.add(suggestSpotsButton);
+        menuPanel.add(logoutButton);
+
+        // Content panel
+        JPanel contentPanel = new JPanel(new BorderLayout());
+        JTextArea outputArea = new JTextArea();
+        outputArea.setEditable(false);
+        JScrollPane scrollPane = new JScrollPane(outputArea);
+        contentPanel.add(scrollPane, BorderLayout.CENTER);
+
+        entryPanel.add(menuPanel, BorderLayout.WEST);
+        entryPanel.add(contentPanel, BorderLayout.CENTER);
+
+        // Button actions
+        viewSpotsButton.addActionListener(e -> {
+            outputArea.setText("");
+            List<String> freeSpots = parkingLot.getFreeSpots();
+            outputArea.append("Free Spots (" + freeSpots.size() + "):\n");
+            freeSpots.forEach(spot -> outputArea.append(spot + "\n"));
+        });
+
+        addCustomerButton.addActionListener(e -> {
+            JPanel addPanel = new JPanel(new GridLayout(2, 2, 10, 10));
+            addPanel.add(new JLabel("Plate Number:"));
+            JTextField plateField = new JTextField();
+            addPanel.add(plateField);
+
+            List<String> freeSpots = parkingLot.getFreeSpots();
+            addPanel.add(new JLabel("Spot ID:"));
+            JComboBox<String> spotCombo = new JComboBox<>(freeSpots.toArray(new String[0]));
+            addPanel.add(spotCombo);
+
+            int result = JOptionPane.showConfirmDialog(frame, addPanel, "Add Customer",
+                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+            if (result == JOptionPane.OK_OPTION) {
+                String plateNumber = plateField.getText();
+                String spotId = (String) spotCombo.getSelectedItem();
+
+                if (plateNumber != null && !plateNumber.trim().isEmpty() && spotId != null) {
+                    // Check if vehicle already parked
+                    List<Ticket> tickets = FileManager.getAllTickets();
+                    for (Ticket t : tickets) {
+                        if (t.getPlateNumber().equalsIgnoreCase(plateNumber.trim())
+                                && t.getExitTime() == null) {
+                            JOptionPane.showMessageDialog(frame, "Error: Vehicle already parked!",
+                                    "Error", JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
+                    }
+
+                    ParkingSpot spot = parkingLot.getSpotById(spotId);
+                    if (spot != null) {
+                        spot.setOccupied(true);
+                        FileManager.saveSpotToFile(spot);
+
+                        Customer customer = new Customer();
+                        Ticket ticket = customer.printEntryTicket(plateNumber, spotId, loggedInUser.getName());
+
+                        if (ticket != null) {
+                            StringBuilder ticketInfo = new StringBuilder();
+                            ticketInfo.append("\n=== Parking Ticket ===\n");
+                            ticketInfo.append("Ticket ID: ").append(ticket.getTicketId()).append("\n");
+                            ticketInfo.append("Plate Number: ").append(ticket.getPlateNumber()).append("\n");
+                            ticketInfo.append("Transaction Number: ").append(ticket.getTicketId()).append("\n");
+                            ticketInfo.append("Entry Operator: ").append(loggedInUser.getName()).append("\n");
+                            ticketInfo.append("Entry Time: ").append(ticket.getEntryTime()).append("\n");
+                            ticketInfo.append("Assigned Spot: ").append(spotId).append("\n");
+                            ticketInfo.append("=======================\n");
+
+                            outputArea.append(ticketInfo.toString());
+                        } else {
+                            outputArea.append("Failed to create ticket!\n");
+                            spot.setOccupied(false);
+                            FileManager.saveSpotToFile(spot);
+                        }
+                    }
+                }
+            }
+        });
+
+        suggestSpotsButton.addActionListener(e -> {
+            outputArea.setText("");
+            ParkingSpot spot = parkingLot.getNextFreeSpot();
+            if (spot != null) {
+                outputArea.append("Suggested spot: " + spot.getSpotId() + " (Free)\n");
+            } else {
+                outputArea.append("No free spots available.\n");
+            }
+        });
+
+        logoutButton.addActionListener(e -> {
+            loggedInUser.logout();
+            cardLayout.show(cardPanel, "LoginPanel");
+        });
+
+        cardPanel.add(entryPanel, "EntryOperatorPanel");
+    }
+
+    private static void createExitOperatorPanel() {
+        JPanel exitPanel = new JPanel(new BorderLayout());
+
+        // Menu panel
+        JPanel menuPanel = new JPanel(new GridLayout(3, 1, 10, 10));
+        menuPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JButton calculateButton = new JButton("Calculate Payment");
+        JButton printReceiptButton = new JButton("Print Receipt");
+        JButton logoutButton = new JButton("Logout");
+
+        menuPanel.add(calculateButton);
+        menuPanel.add(printReceiptButton);
+        menuPanel.add(logoutButton);
+
+        // Content panel
+        JPanel contentPanel = new JPanel(new BorderLayout());
+        JTextArea outputArea = new JTextArea();
+        outputArea.setEditable(false);
+        JScrollPane scrollPane = new JScrollPane(outputArea);
+        contentPanel.add(scrollPane, BorderLayout.CENTER);
+
+        exitPanel.add(menuPanel, BorderLayout.WEST);
+        exitPanel.add(contentPanel, BorderLayout.CENTER);
+
+        // Button actions
+        calculateButton.addActionListener(e -> {
+            String ticketIdStr = JOptionPane.showInputDialog(frame, "Enter ticket ID:");
+            if (ticketIdStr != null && !ticketIdStr.trim().isEmpty()) {
+                try {
+                    long ticketId = Long.parseLong(ticketIdStr);
+                    Ticket ticket = FileManager.getTicketById(ticketId);
+
+                    if (ticket == null) {
+                        outputArea.append("Ticket not found.\n");
+                    } else {
+                        if (ticket.getExitTime() != null) {
+                            outputArea.append("This ticket has already been paid.\n");
+                        } else {
+                            ticket.setExitTime(LocalDateTime.now());
+                            double payment = ticket.calculatePayment();
+
+                            ParkingSpot spot = parkingLot.getSpotById(ticket.getSpotId());
+                            if (spot != null) {
+                                spot.setOccupied(false);
+                                FileManager.saveSpotToFile(spot);
+                            }
+
+                            FileManager.saveTicketToFile(ticket);
+                            outputArea.append("Payment processed: £" + payment + "\n");
+                        }
+                    }
+                } catch (NumberFormatException ex) {
+                    outputArea.append("Invalid ticket ID format.\n");
+                }
+            }
+        });
+
+        printReceiptButton.addActionListener(e -> {
+            String ticketIdStr = JOptionPane.showInputDialog(frame, "Enter ticket ID:");
+            if (ticketIdStr != null && !ticketIdStr.trim().isEmpty()) {
+                try {
+                    long ticketId = Long.parseLong(ticketIdStr);
+                    Ticket ticket = FileManager.getTicketById(ticketId);
+
+                    if (ticket == null) {
+                        outputArea.append("Ticket not found.\n");
+                    } else {
+                        double payment = ticket.calculatePayment();
+                        StringBuilder receipt = new StringBuilder();
+                        receipt.append("\n--- Receipt ---\n");
+                        receipt.append("Ticket ID: ").append(ticket.getTicketId()).append("\n");
+                        receipt.append("Plate Number: ").append(ticket.getPlateNumber()).append("\n");
+                        receipt.append("Entry Time: ").append(ticket.getEntryTime()).append("\n");
+                        receipt.append("Exit Time: ").append(ticket.getExitTime()).append("\n");
+                        receipt.append("Total Payment: £").append(payment).append("\n");
+                        receipt.append("----------------\n");
+
+                        outputArea.append(receipt.toString());
+                    }
+                } catch (NumberFormatException ex) {
+                    outputArea.append("Invalid ticket ID format.\n");
+                }
+            }
+        });
+
+        logoutButton.addActionListener(e -> {
+            loggedInUser.logout();
+            cardLayout.show(cardPanel, "LoginPanel");
+        });
+
+        cardPanel.add(exitPanel, "ExitOperatorPanel");
+    }
+}
