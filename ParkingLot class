@@ -1,0 +1,63 @@
+package model;
+import service.FileManager;
+
+import java.util.*;
+import java.util.stream.Collectors;
+public class ParkingLot {
+    private List<ParkingSpot> spots = new ArrayList<>();
+    // Fixed duplicate declaration
+
+    public ParkingLot() {
+        this.spots = FileManager.loadSpotsFromFile();
+        if (spots.isEmpty()) {
+
+            for (int i = 1; i <= 10; i++) {
+                spots.add(new ParkingSpot("SPOT-" + i, false));
+            }
+        }
+    }
+
+    public void addSpot(ParkingSpot spot) {
+        spots.add(spot);
+    }
+
+    public List<String> getFreeSpots() {
+        return spots.stream()
+                .filter(spot -> !spot.isOccupied())
+                .map(ParkingSpot::getSpotId)
+                .collect(Collectors.toList());
+    }
+
+
+    public ParkingSpot getNextFreeSpot() {
+        return spots.stream()
+                .filter(s -> !s.isOccupied())
+                .findFirst()
+                .orElse(null); // Return null instead of "None"
+    }
+
+    public int getTotalSpots() {
+        return spots.size();
+    }
+
+
+    public void loadSpotsFromFile(List<ParkingSpot> fileSpots) {
+        spots.clear();
+        spots.addAll(fileSpots);
+    }
+
+    public void removeSpot(ParkingSpot spot) {
+        spots.remove(spot);
+    }
+
+    public ParkingSpot getSpotById(String spotId) {
+        return spots.stream()
+                .filter(spot -> spot.getSpotId().equals(spotId))
+                .findFirst()
+                .orElse(null);
+    }
+
+    public List<ParkingSpot> getSpots() {
+        return spots;
+    }
+}
